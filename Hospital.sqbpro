@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="C:/Users/ratch/OneDrive/เดสก์ท็อป/Program Analyst/SQL-1/Hospital.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="2744"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="monthly_revenue" custom_title="0" dock_id="1" table="4,15:mainmonthly_revenue"/><dock_state state="000000ff00000000fd0000000100000002000005b2000003b7fc0100000001fb000000160064006f0063006b00420072006f00770073006500310100000000000005b20000012a00ffffff000005b20000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="appointments" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="98"/><column index="2" value="66"/><column index="3" value="62"/><column index="4" value="114"/><column index="5" value="114"/><column index="6" value="103"/><column index="7" value="79"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="billing" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="41"/><column index="2" value="66"/><column index="3" value="84"/><column index="4" value="87"/><column index="5" value="63"/><column index="6" value="110"/><column index="7" value="102"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="doctors" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="62"/><column index="2" value="70"/><column index="3" value="68"/><column index="4" value="95"/><column index="5" value="94"/><column index="6" value="110"/><column index="7" value="135"/><column index="8" value="231"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="monthly_revenue" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="63"/><column index="2" value="71"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="treatments" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="84"/><column index="2" value="98"/><column index="3" value="111"/><column index="4" value="151"/><column index="5" value="63"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1">--หาแผนกที่ทำเงินได้มากที่สุด
+SELECT treatment_type,count(*)as treatment_count,sum(cost) as total_cost
+FROM treatments
+GROUP by treatment_type
+order by total_cost DESC;
+
+--หารายได้ต่อเดือน
+SELECT strftime('%Y-%m',bill_date) as billing_month,
+		sum(amount) as total_revenue
+FROM billing
+GROUP by billing_month
+order by billing_month;
+
+--หาหมอที่ทำเงินได้มากที่สุด
+SELECT doctors.first_name||' '||doctors.last_name as doctor_name,
+		specialization,
+		sum(billing.amount) as total_revenue
+FROM billing
+JOIN treatments on billing.treatment_id = treatments.treatment_id
+JOIN patients on billing.patient_id = patients.patient_id
+JOIN appointments on treatments.appointment_id = appointments.appointment_id
+JOIN doctors on appointments.doctor_id = doctors.doctor_id
+GROUP by doctor_name
+ORDER by total_revenue DESC;
+
+--หาคนไข้ที่เข้ารับการรักษาเยอะที่สุดและมีค่าใช้จ่ายเท่าไหร่
+SELECT patients.first_name||' '||patients.last_name as patient_name,
+		treatments.cost,count(appointments.appointment_date) as count_date
+FROM appointments
+JOIN treatments on appointments.appointment_id = treatments.appointment_id
+JOIN patients on appointments.patient_id = patients.patient_id
+GROUP by patient_name
+order by count_date DESC;
+
+--หาคนไข้ที่ยกเลิกนัดหรือไม่มาตามนัด
+SELECT patients.first_name||' '||patients.last_name as patient_name,
+	count(*) as missed
+FROM appointments
+JOIN patients on appointments.patient_id = patients.patient_id
+WHERE status = &quot;No-show&quot; or status = &quot;Cancelled&quot;
+group by patient_name
+ORDER by missed DESC;
+--หา KPIของหมอแต่ละคนว่าสามารถสร้างรายรับได้เท่าไหร่และจำนวนการเข้ารับการรักษาเท่าไหร่
+SELECT doctors.first_name||' '||doctors.last_name as Doctor_name,
+		sum(billing.amount) as total_revenue,count(DISTINCT appointments.appointment_id) as count_app
+FROM doctors
+JOIN appointments on doctors.doctor_id = appointments.doctor_id
+JOIN treatments on appointments.appointment_id = treatments.appointment_id
+JOIN billing on treatments.treatment_id = billing.treatment_id
+GROUP by Doctor_name
+ORDER by total_revenue DESC;
+
+--View for income per month
+/*CREATE VIEW monthly_revenue as
+SELECT strftime('%Y-%m',billing_date) as month,
+	sum(bill.amount) as total
+FROM billing
+GROUP by month;*/
+
+--View for KPI Doctor
+/*CREATE VIEW doctors_KPI as
+SELECT doctors.first_name||' '||doctors.last_name as Doctor_name,
+		sum(billing.amount) as total_revenue,count(DISTINCT appointments.appointment_id) as count_app
+FROM doctors
+JOIN appointments on doctors.doctor_id = appointments.doctor_id
+JOIN treatments on appointments.appointment_id = treatments.appointment_id
+JOIN billing on treatments.treatment_id = billing.treatment_id
+GROUP by Doctor_name
+ORDER by total_revenue DESC;*/
+
+
+SELECT * 
+FROM doctors_KPI;
+
+SELECT * 
+FROM monthly_revenue;
+</sql><current_tab id="0"/></tab_sql></sqlb_project>
